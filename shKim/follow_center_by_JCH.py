@@ -27,6 +27,7 @@ class Follower:
         #upper_white = numpy.array([0,0,255])
 
         mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+        masked_center = cv2.bitwise_and(image, image, mask=mask_yellow)
         #mask_white = cv2.inRange(hsv, lower_white, upper_white)
         h, w, d = image.shape
         search_top = 3*h/4
@@ -47,6 +48,7 @@ class Follower:
             # END CONTROL
         cv2.imshow("window", image)
         cv2.imshow("mask", mask_yellow)
+        cv2.imshow("masked", masked_center)
         cv2.waitKey(3)
 
 
