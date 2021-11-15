@@ -59,7 +59,7 @@ class Follower:
             cy_white = int(M_w['m01'] / M_w['m00'])
 
             cx = (cx_yellow + cx_white)  // 2
-            cy = (cy_yellow + cy_white) // 2
+            cy = (cy_yellow + cy_white ) // 2
 
             #cv2.circle(image, (cx_yellow, cy_yellow), 20, (0, 255, 255), -1)
             #cv2.circle(image, (cx_white, cy_white), 20, (255, 255, 255), -1)
@@ -71,8 +71,8 @@ class Follower:
             self.cmd_vel_pub.publish(self.twist)
             # END CONTROL
         cv2.imshow("orig_window", image)
-        cv2.imshow("hsv_window", masked_yellow)
-        cv2.imshow("hsv2_window", masked_white)
+        cv2.imshow("hsv_yellow_window", masked_yellow)
+        cv2.imshow("hsv_white_window", masked_white)
 
         cv2.waitKey(3)
 

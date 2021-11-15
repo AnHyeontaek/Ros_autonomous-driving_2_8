@@ -24,6 +24,7 @@ while not rospy.is_shutdown():
             #if sensor value is under 1.5
             driving_forward = False
             state_change_time = rospy.Time.now() + rospy.Duration(5)
+            print("Obstacle detect")
 
     else:
         if rospy.Time.now() > state_change_time:
