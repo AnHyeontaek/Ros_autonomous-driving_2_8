@@ -13,6 +13,7 @@ class Follower:
         self.count = 1
         self.bridge = cv_bridge.CvBridge()
         self.drive_pub = rospy.Publisher('drive', drive_key, queue_size=1)
+        self.drive_pub_2 = rospy.Publisher('drive_2', drive_key, queue_size=1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw',
                                           Image, self.image_callback)
         self.twist = Twist()
@@ -39,6 +40,7 @@ class Follower:
             self.twist.linear.x = 0
             self.drive_key.twist = self.twist
             self.drive_pub.publish(self.drive_key)
+            self.drive_pub_2.publish(self.drive_key)
         cv2.waitKey(3)
 
 
