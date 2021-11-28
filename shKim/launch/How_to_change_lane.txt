@@ -1,0 +1,11 @@
+add car_test.launch, kobiki2.launch.xml file to deu_car/launch
+
+if you want located turtlebot at first lane 
+run this command
+roscd deu_car && source ./gazebo_env.sh && roslaunch deu_car car_test.launch
+
+or if you want located turtlebot at second lane
+run this command
+roscd deu_car && source ./gazebo_env.sh && roslaunch deu_car car_test2.launch
+
+It needs some time to change location. So wiat at least 30 second if you want to change location.
