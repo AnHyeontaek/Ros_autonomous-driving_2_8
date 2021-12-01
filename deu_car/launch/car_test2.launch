@@ -41,5 +41,8 @@
   <arg name="node_start_delay" default="3.0" />  
   <node pkg="deu_car" type="follow_white.py" name="follow_white" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' " output="screen"/>
   <node pkg="deu_car" type="follow_bar.py" name="follow_bar"/>
+  <node pkg="deu_car" type="follow_last_course.py" name="follow_last_course"/>
+  <node pkg="deu_car" type="find_obstacle.py" name="find_obstacle"/>
+  <node pkg="deu_car" type="detect_sign.py" name="detect_sign"/>
   <node pkg="deu_car" type="blocking_bar_control.sh" name="blocking_bar_01"  />
 </launch>
