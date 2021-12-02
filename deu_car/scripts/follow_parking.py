@@ -7,22 +7,22 @@ from std_msgs.msg import String
 from deu_car.msg import drive_key
 
 
-class Follow_parking:
+class Change_course:
     def __init__(self):
         self.count = 1
         self.bridge = cv_bridge.CvBridge()
-        self.parking_pub = rospy.Publisher('parking', drive_key, queue_size=1)
+        self.change_course_pub = rospy.Publisher('change_course', drive_key, queue_size=1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw',
                                           Image, self.image_callback)
-        self.switch_sub = rospy.Subscriber('park', String, self.switch)
+        self.switch_sub = rospy.Subscriber('change', String, self.switch)
         self.twist = Twist()
         self.drive_key = drive_key()
         self.drive_key.key = "run"
-        self.parking = False
-        self.parking_yellow = False
+        self.change_course = False
+        self.change_course_yellow = False
 
     def switch(self, msg):
-        self.parking = True
+        self.change_course = True
 
     def image_callback(self, msg):
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -54,26 +54,26 @@ class Follow_parking:
         M = cv2.moments(mask_white)
         M_yellow = cv2.moments(mask_yellow)
 
-        if self.parking and M_yellow['m00'] > 0:
-            self.parking = False
+        if self.change_course and M_yellow['m00'] > 0:
+            self.change_course = False
             self.twist = Twist()
             self.drive_key.twist = self.twist
-            self.drive_key.key = "parking_end"
-            self.parking_pub.publish(self.drive_key)
+            self.drive_key.key = "change_course_end"
+            self.change_course_pub.publish(self.drive_key)
             return
 
-        if self.parking and M['m00'] > 0:
+        if self.change_course and M['m00'] > 0:
             cx = int(M['m10']/M['m00'])
             err = (cx + 200) - w / 2
             self.twist.linear.x = 0.3
             self.twist.angular.z = -float(err) / 212.5  # 400: 0.1, 300: 0.15, 250, 0.2
             self.drive_key.twist = self.twist
-            self.parking_pub.publish(self.drive_key)
+            self.change_course_pub.publish(self.drive_key)
 
 
         cv2.waitKey(3)
 
 
 rospy.init_node('follower_park')
-follower = Follow_parking()
+follower = Change_course()
 rospy.spin()
