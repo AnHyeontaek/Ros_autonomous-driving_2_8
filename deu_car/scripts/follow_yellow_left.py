@@ -24,7 +24,7 @@ class Follow_yellow_left:
         self.find_right = 0 # 주차코스 진입을 위해 오른쪽 노란색을 찾아야 할때 값이 1로 주어져 켜진다.
         self.found_right = 0 # 주차코스 진입을 위해 오른쪽 노란색을 찾다가 찾았을 때 값이 1로 주어져 켜진다.
         self.found_right2 = 0 # 노란색을 찾아 읽고 있다가 노란색이 끊기면 값이 1로 주어진다.
-        self.parking_start = 0 # 주차 시작을 알리는 변수 주차가 시작될 때 1로 값이 주어진다.
+        self.change_course_start = 0 # 주차 시작을 알리는 변수 주차가 시작될 때 1로 값이 주어진다.
         self.speed = 0.5 # 기본 속도 0.5
         self.angular = 200 # 기본 회전값 200
 
@@ -37,8 +37,8 @@ class Follow_yellow_left:
         elif msg.data == "2": # 주차구간 종료 시
             self.only_left = True # 색 추적 범위를 화면 왼쪽에 제한한다.
             self.find_right = 0 # 오른쪽 색 추적 을 종료한다.
-            self.parking_start = 0 # 주차 시작 변수를 0으로 초기화한다.
-        elif msg.data == "parking": # 주차 준비 코스 진입 시
+            self.change_course_start = 0 # 주차 시작 변수를 0으로 초기화한다.
+        elif msg.data == "change_course": # 주차 준비 코스 진입 시
             self.only_left = True # 색 추적 범위를 화면 왼쪽에 제한한다.
             self.find_right = 1 # 화면 오른쪽의 색 추적을 따로 시작한다.
             self.found_right = 0 
@@ -97,10 +97,10 @@ class Follow_yellow_left:
             if self.found_right == 1 and self.found_right2 == 0: # 우측에서 색추적을 하다가 끊겼을 경우
                 self.find_right = 0 # 우측 색추적 종료
                 self.only_left = 0 # 좌측 색추적 제한 종료
-                self.parking_start = 1 # 주차 시작가능
+                self.change_course_start = 1 # 주차 시작가능
 
-        if self.parking_start == 1 and M_right['m00'] > 0: # 주차가 시작됐으며 우측의 노란색을 색추적 성공했을 경우
-            self.drive_key.key = "parking_start" # 주차 시작 키값을 drive.py에 보낸다.
+        if self.change_course_start == 1 and M_right['m00'] > 0: # 주차가 시작됐으며 우측의 노란색을 색추적 성공했을 경우
+            self.drive_key.key = "change_course_start" # 주차 시작 키값을 drive.py에 보낸다.
             self.drive_key.twist = Twist() # 보낼 twist 초기화
             self.drive_pub.publish(self.drive_key) # 만들어진 drive_key를 보낸다
 
@@ -132,7 +132,7 @@ class Follow_yellow_left:
                     self.drive_pub.publish(self.drive_key)
                 else: # 흰선이 사라지면 곡선 코스가 종료됐다는 뜻이다.
                     self.route = ""
-            elif self.parking_start: # 주차 시작이 가능할 경우
+            elif self.change_course_start: # 주차 시작이 가능할 경우
                 self.twist.linear.x = 0.2 # 잠시 속도를 늦춘다.
                 self.drive_key.twist = self.twist
                 self.drive_key.key = "run"
