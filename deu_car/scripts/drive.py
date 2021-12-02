@@ -28,7 +28,7 @@ class Drive:
         self.drive_tr = ""
         self.drive_sub = rospy.Subscriber('drive', drive_key, self.drive_cb)
         self.drive_sub_2 = rospy.Subscriber('drive_2', drive_key, self.drive_cb_2)
-        self.parking_sub = rospy.Subscriber('parking', drive_key, self.parking_cb)
+        self.change_course_sub = rospy.Subscriber('change_course', drive_key, self.change_course_cb)
         self.bar_sub = rospy.Subscriber('bar', drive_key, self.follow_bar)
         self.drive_last_course_sub = rospy.Subscriber('drive_last_course', drive_key, self.drive_last_course_cb)
         self.find_obstacle_sub = rospy.Subscriber("find_obstacle", drive_key, self.find_obstacle_cb)
@@ -39,7 +39,7 @@ class Drive:
                                            Twist, queue_size=1)
         self.drive_route_pub = rospy.Publisher('select_route', String, queue_size=1)
         self.speed_pub = rospy.Publisher('speed', String, queue_size=1)
-        self.parking_pub = rospy.Publisher('park', String, queue_size=1)
+        self.change_course_pub = rospy.Publisher('change', String, queue_size=1)
         self.g_last_send_time = rospy.Time.now()
         self.ramp = 0.5
         self.last_twist = Twist()
@@ -88,7 +88,7 @@ class Drive:
         time.sleep(10)
         self.drive_state = "run"
         time.sleep(3)
-        self.drive_route_pub.publish("parking")
+        self.drive_route_pub.publish("change_course")
 
     def drive_cb(self, msg):
         if self.drive_route == 1:
@@ -144,7 +144,7 @@ class Drive:
                 self.can_stop = False
                 t = threading.Thread(target=self.wait, args=[stop_time])
                 t.start()
-            elif self.drive_tr == "parking_start":
+            elif self.drive_tr == "change_course_start":
                 self.drive_route = 2
                 self.drive_route_pub.publish("1")
 
@@ -175,7 +175,7 @@ class Drive:
                         self.speed_pub.publish("low")
                     elif self.cross == 8:
                         self.drive_route = 3
-                        self.parking_pub.publish("on")
+                        self.change_course_pub.publish("on")
                         stop_time = 10
                     else:
                         self.speed_pub.publish("middle")
@@ -183,7 +183,7 @@ class Drive:
                     t = threading.Thread(target=self.wait, args=[stop_time])
                     t.start()
 
-    def parking_cb(self, msg):
+    def change_course_cb(self, msg):
         if self.drive_route == 3:
             self.drive_tr = msg.key
             self.twist = msg.twist
@@ -191,20 +191,15 @@ class Drive:
                 self.send_twist(self.twist)
             elif self.drive_tr == "stop" and self.can_stop:
                 self.cross += 1
-                self.drive_state = "stop"
-                self.send_twist(self.twist)
-                time.sleep(5)
-                stop_time = 3
-                if self.cross == 9:
-                    stop_time = 30
-                    self.drive_route = 4
-                    s = threading.Thread(target=self.turn)
-                    s.start()
+                stop_time = 30
+                self.drive_route = 4
+                s = threading.Thread(target=self.turn)
+                s.start()
                 self.drive_state = "run"
                 self.can_stop = False
                 t = threading.Thread(target=self.wait, args=[stop_time])
                 t.start()
-            elif self.drive_tr == "parking_end":
+            elif self.drive_tr == "change_course_end":
                 self.drive_state = "run_straight"
                 p = threading.Thread(target=self.cross_run_1, args=[2])
                 p.start()
