@@ -24,7 +24,7 @@ class Follow_yellow_right:
         self.drive_route_count = 0 # 색 추적 불가 시 색 추적 범위 변경을 위해 사용될 변수 5 이상일시 가능
         self.speed = 0.5 # 기본 속도 0.5
         self.angular = 212.5 # 기본 회전값 200
-        self.parking = False # 주차 시작 시 True 가 된다.
+        self.change_course = False # 주차 시작 시 True 가 된다.
 
     def speed_cb(self, msg):  # 속도 변경 토픽 구독 콜백 함수
         if msg.data == "low":
@@ -46,8 +46,8 @@ class Follow_yellow_right:
             self.this_pub_state = 1
         elif msg.data == "1": # 주차구간 시작 시
             self.only_right = True # 색 추적을 오직 오른쪽만
-        else: # parking이 넘어옴
-            self.parking = True # 주차 중
+        else: # change_course 넘어옴
+            self.change_course = True # 주차 중
 
     def image_callback(self, msg):
         self.drive_key.key = "" # drive_key.key 초기화
@@ -63,7 +63,7 @@ class Follow_yellow_right:
         search_top = 3*h/4
         search_bot = search_top + 20
         mask_yellow[0:search_top, 0:w] = 0
-        if not self.parking: # 주차중이 아닐때
+        if not self.change_course: # 주차중이 아닐때
             mask_yellow[search_bot:h, 0:w] = 0 # 아래쪽은 찾지 않음
             # 주차코스 진입 시 오른쪽의 노란색 차선을 보고 들어가는데 
         if self.only_right: 
@@ -78,7 +78,7 @@ class Follow_yellow_right:
             # BEGIN CONTROL
             cx_yellow = int(M['m10']/M['m00'])
             err = (cx_yellow - 250) - w / 2
-            if self.parking:
+            if self.change_course:
                 err = (cx_yellow - 250) - w / 2
             self.twist.linear.x = self.speed
             self.twist.angular.z = -float(err) / (self.angular)  # 400: 0.1, 300: 0.15, 250, 0.2
@@ -87,7 +87,7 @@ class Follow_yellow_right:
             self.drive_pub.publish(self.drive_key)
             # END CONTROL
         else:
-            if self.parking:
+            if self.change_course:
                 self.twist.linear.x = 0.5
                 self.drive_key.twist = self.twist
                 self.drive_key.key = "run"
