@@ -9,8 +9,9 @@ from std_msgs.msg import String
 from deu_car.msg import drive_key
 import threading
 import sys
+import math
 
-class Follower:
+class Drive:
     def __init__(self, count):
         if count == "1":
             self.start_route = 1  # 1 left or 2 right
@@ -39,23 +40,55 @@ class Follower:
         self.drive_route_pub = rospy.Publisher('select_route', String, queue_size=1)
         self.speed_pub = rospy.Publisher('speed', String, queue_size=1)
         self.parking_pub = rospy.Publisher('park', String, queue_size=1)
+        self.g_last_send_time = rospy.Time.now()
+        self.ramp = 0.5
+        self.last_twist = Twist()
         self.twist = Twist()
+        self.end_sign = False
+
+    def ramped_vel(self, v_prev, v_target, t_prev, t_now, ramp_rate):
+        # compute maximum velocity step
+        step = ramp_rate * (t_now - t_prev).to_sec()
+        sign = 1.0 if (v_target > v_prev) else -1.0
+        error = math.fabs(v_target - v_prev)
+        if error < step:  # we can get there within this timestep. we're done.
+            return v_target
+        else:
+            return v_prev + sign * step  # take a step towards the target
+
+    def ramped_twist(self, prev, target, t_prev, t_now, ramp):
+        tw = Twist()
+        tw.linear.x = self.ramped_vel(prev.linear.x, target.linear.x, t_prev,
+                                 t_now, ramp)
+        tw.angular.z = target.angular.z
+        return tw
+
+    def send_twist(self, target):
+        t_now = rospy.Time.now()
+        self.last_twist = self.ramped_twist(self.last_twist, target,
+                                    self.g_last_send_time, t_now, self.ramp)
+        self.g_last_send_time = t_now
+        self.cmd_vel_pub.publish(self.last_twist)
 
     def wait(self, stop_time):
         time.sleep(stop_time)
         self.can_stop = True
+        if stop_time == 20:
+            self.end_sign = True
+
+    def accel(self):
+        time.sleep(5)
+        self.speed_pub.publish("middle")
 
     def cross_run_1(self, count):
         time.sleep(count)
         self.drive_state = "run"
 
     def cross_run_2(self):
-        time.sleep(12)
+        time.sleep(10)
         self.drive_state = "run"
         time.sleep(3)
         self.drive_route_pub.publish("parking")
-
-
 
     def drive_cb(self, msg):
         if self.drive_route == 1:
@@ -63,23 +96,24 @@ class Follower:
             self.twist = msg.twist
             if self.on_bar == 1:
                 self.twist.linear.x = 0
-                self.cmd_vel_pub.publish(self.twist)
+                self.send_twist(self.twist)
                 return
             if self.drive_tr == "run" and self.drive_state == "run":
-                self.cmd_vel_pub.publish(self.twist)
+                self.send_twist(self.twist)
             elif self.drive_tr == "stop" and self.can_stop:
                 self.cross += 1
                 self.drive_state = "stop"
-                print("stop line : ", self.cross)
-                self.cmd_vel_pub.publish(self.twist)
+                self.send_twist(self.twist)
                 time.sleep(3)
                 stop_time = 3
                 self.drive_state = "run"
                 if self.cross == 1:
                     self.bar_sub.unregister()
+                    self.speed_pub.publish("middle")
                 elif self.cross == 2:
                     self.speed_pub.publish("low")
                 elif self.cross == 4:
+                    self.speed_pub.publish("low")
                     self.drive_state = "run_straight"
                     p = threading.Thread(target=self.cross_run_1, args=[10])
                     p.start()
@@ -88,14 +122,15 @@ class Follower:
                     self.speed_pub.publish("low")
                     if self.start_route == 1:
                         self.drive_route = 1
-                        self.drive_route_pub.publish("1")
+                        self.drive_route_pub.publish("course_turning")
                         self.cross += 1
                         stop_time = 30
                     elif self.start_route == 2:
                         self.drive_route = 2
-                        self.drive_route_pub.publish("2")
+                        self.drive_route_pub.publish("course_turning")
                         stop_time = 30
                 elif self.cross == 7:
+                    self.speed_pub.publish("low")
                     self.drive_state = "run_straight"
                     p = threading.Thread(target=self.cross_run_2)
                     p.start()
@@ -109,10 +144,6 @@ class Follower:
                 self.can_stop = False
                 t = threading.Thread(target=self.wait, args=[stop_time])
                 t.start()
-            elif self.drive_state == "run_straight":
-                self.twist.linear.x = 0.5
-                self.twist.angular.z = 0
-                self.cmd_vel_pub.publish(self.twist)
             elif self.drive_tr == "parking_start":
                 self.drive_route = 2
                 self.drive_route_pub.publish("1")
@@ -126,20 +157,20 @@ class Follower:
             else:
                 if self.on_bar == 1:
                     self.twist.linear.x = 0
-                    self.cmd_vel_pub.publish(self.twist)
+                    self.send_twist(self.twist)
                     return
                 if self.drive_tr == "run" and self.drive_state == "run":
-                    self.cmd_vel_pub.publish(self.twist)
+                    self.send_twist(self.twist)
                 elif self.drive_tr == "stop" and self.can_stop:
                     self.drive_state = "stop"
                     self.cross += 1
-                    print("%d th stop line", self.cross)
-                    self.cmd_vel_pub.publish(self.twist)
+                    self.send_twist(self.twist)
                     time.sleep(3)
                     self.drive_state = "run"
                     stop_time = 3
                     if self.cross == 1:
                         self.bar_sub.unregister()
+                        self.speed_pub.publish("middle")
                     elif self.cross == 2:
                         self.speed_pub.publish("low")
                     elif self.cross == 8:
@@ -151,25 +182,21 @@ class Follower:
                     self.can_stop = False
                     t = threading.Thread(target=self.wait, args=[stop_time])
                     t.start()
-                elif self.drive_state == "run_straight":
-                    self.twist.linear.x = 0.5
-                    self.twist.angular.z = 0
-                    self.cmd_vel_pub.publish(self.twist)
 
     def parking_cb(self, msg):
         if self.drive_route == 3:
             self.drive_tr = msg.key
             self.twist = msg.twist
             if self.drive_tr == "run" and self.drive_state == "run":
-                self.cmd_vel_pub.publish(self.twist)
+                self.send_twist(self.twist)
             elif self.drive_tr == "stop" and self.can_stop:
                 self.cross += 1
                 self.drive_state = "stop"
-                self.cmd_vel_pub.publish(self.twist)
+                self.send_twist(self.twist)
                 time.sleep(5)
                 stop_time = 3
                 if self.cross == 9:
-                    stop_time = 10
+                    stop_time = 30
                     self.drive_route = 4
                     s = threading.Thread(target=self.turn)
                     s.start()
@@ -178,7 +205,6 @@ class Follower:
                 t = threading.Thread(target=self.wait, args=[stop_time])
                 t.start()
             elif self.drive_tr == "parking_end":
-                print(self.drive_state)
                 self.drive_state = "run_straight"
                 p = threading.Thread(target=self.cross_run_1, args=[2])
                 p.start()
@@ -187,36 +213,44 @@ class Follower:
         elif self.drive_route == 4:
             self.twist.linear.x = 0
             self.twist.angular.z = -0.2
-            self.cmd_vel_pub.publish(self.twist)
+            self.send_twist(self.twist)
 
     def drive_last_course_cb(self, msg):
         if self.drive_route == 5:
             self.drive_tr = msg.key
             self.twist = msg.twist
             if self.drive_tr == "run" and self.drive_state == "run":
-                self.cmd_vel_pub.publish(self.twist)
+                self.send_twist(self.twist)
 
     def find_obstacle_cb(self, msg):
         if msg.key == "obstacle":
             self.drive_state = "obstacle_stop"
+            self.speed_pub.publish("high")
+            t = threading.Thread(target=self.accel)
+            t.start()
             self.twist = Twist()
-            self.cmd_vel_pub.publish(self.twist)
+            self.send_twist(self.twist)
         elif msg.key == "no_obstacle" and self.drive_state == "obstacle_stop":
             self.drive_state = "run"
 
     def sign_cb(self, msg):
         if self.can_stop:
             self.drive_state = "stop"
+            if self.end_sign:
+                self.drive_sub.unregister()
+                self.sign_sub.unregister()
+                self.drive_sub_2.unregister()
+                self.drive_last_course_sub.unregister()
             time.sleep(3)
-            stop_time = 3
+            stop_time = 20
+            self.drive_state = "run"
             self.can_stop = False
             t = threading.Thread(target=self.wait, args=[stop_time])
             t.start()
 
     def turn(self):
-        time.sleep(10)
+        time.sleep(12)
         self.drive_route = 3
-        print("yeah")
 
     def follow_bar(self, msg):
         if msg.key == "bar":
@@ -226,12 +260,17 @@ class Follower:
 
     def image_callback(self, msg):
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        if self.drive_state == "run_straight":
+            self.twist.linear.x = 0.5
+            self.twist.angular.z = 0
+            self.send_twist(self.twist)
         cv2.imshow("window", image)
         cv2.waitKey(3)
 
+    def end(self):
+        print("program end")
 
 if __name__ == "__main__":
     rospy.init_node('drive')
-    print(sys.argv[1])
-    follower = Follower(sys.argv[1])
+    drive = Drive(sys.argv[1])
     rospy.spin()

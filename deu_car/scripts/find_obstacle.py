@@ -22,11 +22,11 @@ class DetectObtacle:
 
         range_right = max(msg.ranges)
 
-        if range_center > 2.3 or range_right > 1.6 or \
+        if range_center > 2.0 or range_right > 1.5 or \
                 ((math.isnan(range_center)) and math.isnan(range_right)):
             self.twist.linear.x = 1.0
             self.drive_key.key = "no_obstacle"
-        else:
+        elif range_center < 2.0 or range_right < 1.5:
             self.twist.linear.x = 0.0
             self.drive_key.key = "obstacle"
         self.drive_key.twist = self.twist

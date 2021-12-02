@@ -16,8 +16,6 @@ class Follower_bar:
         self.drive_key.twist = Twist()
 
     def image_callback(self, msg):
-
-
         bar_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         hsv = cv2.cvtColor(bar_image, cv2.COLOR_BGR2HSV)
 

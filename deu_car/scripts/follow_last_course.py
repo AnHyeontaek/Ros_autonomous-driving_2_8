@@ -9,7 +9,7 @@ from deu_car.msg import drive_key
 from std_msgs.msg import String
 
 
-class Follower:
+class Follow_last_course:
     def __init__(self):
         self.drive_key = drive_key()
         self.bridge = cv_bridge.CvBridge()
@@ -42,31 +42,28 @@ class Follower:
         upper_white = numpy.array([0, 0, 255])
         lower_yellow = numpy.array([0, 128, 128])
         upper_yellow = numpy.array([100, 255, 255])
+        lower = numpy.array([0,0,128])
+        upper = numpy.array([100,255,255])
+        mask = cv2.inRange(hsv,lower,upper)
 
-
-
+        """
         mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+        mask_yellow_right = cv2.inRange(hsv, lower_yellow, upper_yellow)
         mask_white = cv2.inRange(hsv, lower_white, upper_white)
-
-
+            
+        """
         h, w, d = image.shape
         search_top = 3*h/4
         search_bot = search_top + 20
-        mask_yellow[0:search_top, 0:w] = 0
-        mask_yellow[search_bot:h, 0:w] = 0
-        mask_yellow[0:h, w/2:w] = 0
-        mask_white[0:search_top, 0:w] = 0
-        mask_white[search_bot:h, 0:w] = 0
-        mask_white[0:h, w / 2:w] = 0
-        M_yellow = cv2.moments(mask_yellow)
-        M_white = cv2.moments(mask_white)
 
-        if M_yellow['m00'] > 0 or M_white['m00'] > 0:
+        mask[0:search_top, 0:w] = 0
+        mask[search_bot:h, 0:w] = 0
+        mask[0:h, w/2:w] = 0
+
+        M = cv2.moments(mask)
+        if M['m00'] > 0:
             # BEGIN CONTROL
-            if M_yellow['m00'] > 0:
-                cx = int(M_yellow['m10'] / M_yellow['m00'])
-            elif M_white['m00'] > 0:
-                cx = int(M_white['m10'] / M_white['m00'])
+            cx = int(M['m10'] / M['m00'])
             err = (cx + 250) - w / 2
             self.twist.linear.x = self.speed
             self.twist.angular.z = -float(err) / (self.angular)  # 400: 0.1, 300: 0.15, 250, 0.2
@@ -74,8 +71,10 @@ class Follower:
             self.drive_key.key = "run"
             self.drive_pub.publish(self.drive_key)
             # END CONTROL
+
+        cv2.imshow("Dasd", mask)
         cv2.waitKey(3)
 
 rospy.init_node('drive_last_course')
-follower = Follower()
+follower = Follow_last_course()
 rospy.spin()

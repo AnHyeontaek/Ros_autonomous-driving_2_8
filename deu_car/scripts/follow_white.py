@@ -8,19 +8,25 @@ from std_msgs.msg import String
 from deu_car.msg import drive_key
 import threading
 
-class Follower:
+class Follow_white:
     def __init__(self):
         self.count = 1
         self.bridge = cv_bridge.CvBridge()
+        self.bridge = cv_bridge.CvBridge()
         self.drive_pub = rospy.Publisher('drive', drive_key, queue_size=1)
         self.drive_pub_2 = rospy.Publisher('drive_2', drive_key, queue_size=1)
-        self.park_pub = rospy.Publisher('parking', drive_key,  queue_size=1)
+        self.park_pub = rospy.Publisher('parking', drive_key, queue_size=1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw',
                                           Image, self.image_callback)
+        self.isparking = False
         self.twist = Twist()
         self.drive_key = drive_key()
         self.stop_count = 0
         self.drive_key.key = "stop"
+
+    def onpark_cb(self, msg):
+        if msg.data == "on":
+            self.isparking = True
 
     def image_callback(self, msg):
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -55,5 +61,5 @@ class Follower:
 
 
 rospy.init_node('follower_white')
-follower = Follower()
+follower = Follow_white()
 rospy.spin()

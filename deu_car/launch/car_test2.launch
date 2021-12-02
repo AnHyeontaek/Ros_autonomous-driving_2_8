@@ -37,7 +37,7 @@
   <node pkg="deu_car" type="drive.py" name="drive" args="1" output="screen"/>
   <node pkg="deu_car" type="follow_yellow_right.py" name="follow_yellow_right" output="screen"/>
   <node pkg="deu_car" type="follow_parking.py" name="follow_parking"/>
-  <node pkg="deu_car" type="follow_yellow.py" name="follow_yellow" output="screen"/>
+  <node pkg="deu_car" type="follow_yellow_left.py" name="follow_yellow_left" output="screen"/>
   <arg name="node_start_delay" default="3.0" />  
   <node pkg="deu_car" type="follow_white.py" name="follow_white" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' " output="screen"/>
   <node pkg="deu_car" type="follow_bar.py" name="follow_bar"/>

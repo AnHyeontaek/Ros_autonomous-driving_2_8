@@ -7,7 +7,7 @@ from std_msgs.msg import String
 from deu_car.msg import drive_key
 
 
-class Follower:
+class Follow_parking:
     def __init__(self):
         self.count = 1
         self.bridge = cv_bridge.CvBridge()
@@ -70,12 +70,10 @@ class Follower:
             self.drive_key.twist = self.twist
             self.parking_pub.publish(self.drive_key)
 
-        #if self.parking and M_yellow['m00'] > 0:
-        #    self.parking_yellow = True
 
         cv2.waitKey(3)
 
 
 rospy.init_node('follower_park')
-follower = Follower()
+follower = Follow_parking()
 rospy.spin()

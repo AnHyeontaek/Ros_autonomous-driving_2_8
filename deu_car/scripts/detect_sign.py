@@ -21,6 +21,7 @@ class DetectSign:
         self.twist = Twist()
         self.drive_key = drive_key()
         self.drive_key.key = "sign"
+        self.count = 40
 
     def image_callback(self, msg):
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -38,12 +39,11 @@ class DetectSign:
             if m[0].distance / m[1].distance < 0.7:
                 good_matches.append(m[0])
 
-        sign_image = cv2.drawMatches(image, kp1, self.sign_image, kp2, good_matches, None)
-
-        if len(matches) >= 430 and len(matches) <= 433 and len(good_matches) >= 33 and len(good_matches) <= 35:
+        if len(good_matches) >= self.count:
             self.twist.linear.x = 0.0
             self.drive_key.twist = self.twist
             self.sign_pub.publish(self.drive_key)
+            self.count = 50
         cv2.waitKey(3)
         cv2.destroyAllWindows()
 rospy.init_node('detect')

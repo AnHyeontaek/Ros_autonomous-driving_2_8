@@ -9,7 +9,7 @@ from deu_car.msg import drive_key
 from std_msgs.msg import String
 
 
-class Follower:
+class Follow_yellow_right:
     def __init__(self):
         self.this_pub_state = 1
         self.drive_key = drive_key()
@@ -31,14 +31,17 @@ class Follower:
             self.speed = 0.3
             self.angular = 212.5
         elif msg.data == "high":
-            self.speed = 0.7
+            self.speed = 0.9
             self.angular = 200
         elif msg.data == "middle":
             self.speed = 0.5
             self.angular = 200
 
     def select_route_cb(self, msg):
-        if msg.data == "2":
+        if msg.data == "course_turning":
+            self.only_right = False
+            self.this_pub_state = 1
+        elif msg.data == "2":
             self.only_right = False
             self.this_pub_state = 1
         elif msg.data == "1":
@@ -114,10 +117,8 @@ class Follower:
                     self.drive_route_count = 0
                     self.this_pub_state = 0
 
-
-        cv2.imshow("dkdkdko",image)
         cv2.waitKey(3)
 
 rospy.init_node('follower_yellow_2')
-follower = Follower()
+follower = Follow_yellow_right()
 rospy.spin()
