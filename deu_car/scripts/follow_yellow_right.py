@@ -11,22 +11,22 @@ from std_msgs.msg import String
 
 class Follow_yellow_right:
     def __init__(self):
-        self.this_pub_state = 1
-        self.drive_key = drive_key()
-        self.only_right = True
+        self.this_pub_state = 1 #  색추적 범위 변경 시 사용될 변수 1일시 가능
+        self.drive_key = drive_key() # 클래스 내부에서 사용할 커스텀 메시지 String 변수인 key 와 Twist 변수인 twist를 가지고 있다.
+        self.only_right = True # True 일시 우측만 색추적 한다.
         self.bridge = cv_bridge.CvBridge()
-        self.speed_sub = rospy.Subscriber('speed', String, self.speed_cb)
-        self.select_route_sub = rospy.Subscriber('select_route', String, self.select_route_cb)
+        self.speed_sub = rospy.Subscriber('speed', String, self.speed_cb) # 속도 변환 시 발행될 토픽을 받을 구독
+        self.select_route_sub = rospy.Subscriber('select_route', String, self.select_route_cb) # 주차, 곡선코스 등 코스 변경 시 발행될 토픽을 구독
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw',
                                           Image, self.image_callback)
-        self.drive_pub = rospy.Publisher('drive_2', drive_key, queue_size=1)
-        self.twist = Twist()
-        self.drive_route_count = 0
-        self.speed = 0.5
-        self.angular = 212.5
-        self.parking = False
+        self.drive_pub = rospy.Publisher('drive_2', drive_key, queue_size=1) # 클래스에서 모인 정보를 drive2 라는 토픽으로 발행한다. 발행된 정보는 drive.py에서 구독해 사용한다.
+        self.twist = Twist() # twist 초기화
+        self.drive_route_count = 0 # 색 추적 불가 시 색 추적 범위 변경을 위해 사용될 변수 5 이상일시 가능
+        self.speed = 0.5 # 기본 속도 0.5
+        self.angular = 212.5 # 기본 회전값 200
+        self.parking = False # 주차 시작 시 True 가 된다.
 
-    def speed_cb(self, msg):
+    def speed_cb(self, msg):  # 속도 변경 토픽 구독 콜백 함수
         if msg.data == "low":
             self.speed = 0.3
             self.angular = 212.5
@@ -37,35 +37,36 @@ class Follow_yellow_right:
             self.speed = 0.5
             self.angular = 200
 
-    def select_route_cb(self, msg):
-        if msg.data == "course_turning":
+    def select_route_cb(self, msg): # 주차, 곡선코스 등 코스 변경 토픽을 구독할때 불러올 콜백 함수
+        if msg.data == "course_turning": # 곡선코스 진입 시
+            self.only_right = False # 우측 색추적 제한 해제
+            self.this_pub_state = 1 # 색 추적 범위 변경 가능
+        elif msg.data == "2": # 주차구간 종료 시
             self.only_right = False
             self.this_pub_state = 1
-        elif msg.data == "2":
-            self.only_right = False
-            self.this_pub_state = 1
-        elif msg.data == "1":
-            self.only_right = True
-        else:
-            self.parking = True
+        elif msg.data == "1": # 주차구간 시작 시
+            self.only_right = True # 색 추적을 오직 오른쪽만
+        else: # parking이 넘어옴
+            self.parking = True # 주차 중
 
     def image_callback(self, msg):
-        self.drive_key.key = ""
+        self.drive_key.key = "" # drive_key.key 초기화
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        lower_yellow = numpy.array([0, 128, 128])
-        upper_yellow = numpy.array([100, 255, 255])
+        lower_yellow = numpy.array([0, 128, 128]) # 노란색 범위 최소값
+        upper_yellow = numpy.array([100, 255, 255]) # 노란색 범위 최대값
 
-        mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
-        mask_yellow_not_find = cv2.inRange(hsv, lower_yellow, upper_yellow) # mask to find new yellow if car can't find yellow line
+        mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow) # 노란색 추적
+        mask_yellow_not_find = cv2.inRange(hsv, lower_yellow, upper_yellow) # 범위 내에서 노란색을 못 찾았을 때, 다음 노란색을 찾기 위한 추적 범위
         h, w, d = image.shape
         search_top = 3*h/4
         search_bot = search_top + 20
         mask_yellow[0:search_top, 0:w] = 0
-        if not self.parking:
-            mask_yellow[search_bot:h, 0:w] = 0
-        if self.only_right:
+        if not self.parking: # 주차중이 아닐때
+            mask_yellow[search_bot:h, 0:w] = 0 # 아래쪽은 찾지 않음
+            # 주차코스 진입 시 오른쪽의 노란색 차선을 보고 들어가는데 
+        if self.only_right: 
             mask_yellow[0:h, 0:w/2] = 0
         M = cv2.moments(mask_yellow)
 
