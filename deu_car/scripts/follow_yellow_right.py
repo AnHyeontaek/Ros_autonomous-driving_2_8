@@ -85,16 +85,25 @@ class Follow_yellow_right:
             self.drive_pub.publish(self.drive_key)
             # END CONTROL
         else:
-            if self.change_course: # 방향전환 코스에 도달했을 시
+            if self.change_course: # 방향전환 코스에 도달했을 시 실행될 코드 ( 주차구간 들어가기 직전에 노란색이 없어져 정지한다. 때문에 조금 직진하기 위해서 만들었다. )
                 self.twist.linear.x = 0.5 # 속도는 0.5
-                self.drive_key.twist = self.twist # 방향은 
+                self.drive_key.twist = self.twist # 방향은 가던 방향 그대로
                 self.drive_key.key = "run"
                 self.drive_pub.publish(self.drive_key)
-            elif self.this_pub_state == 1:
+            elif self.this_pub_state == 1: 
+                # follow_yellow_right 를 따라 가다가 선을 못찾으면 다음 선을 찾고 follow_yellow_left 로 바꿔주는데, 그때 못찾았다는 명령어로 "not_find"를 보내준다.
+                # follow_yellow_left 로 넘어간 후에도 not_find를 계속 보내서 그걸 방지하기 위한 조건문이다.
+                
                 self.drive_route_count += 1
+                # 굴절코스 진입 시 왼쪽 노란선을 따라가다가 왼쪽에 있는 노란선을 오른쪽에 놓고 따라가게 바꿔야 하는데 그 순간 오른쪽엔 노란선이 없어 not_find를 보낸다.
+                # 따라서 굴절코스 진입과 함께 추적 범위를 왼쪽도 읽게 바꿔주는데
+                # 추적범위를 바꿔도 그 순간에 이 콜백 함수가 실행되면서 노란선을 못 찾아 다음 노란선을 찾으며 follow_yellow_left 로 바뀐다.
+                # 따라서 추적 범위가 바뀌기 전까진 이 아래의 코드가 실행되면 안된다. 때문에 만든 변수다.
+                # 이 콜백 함수가 5번 실행되기 전까진 아래의 코드로 진입을 못한다.
+                
                 if self.drive_route_count == 5:
-                    for i in range(7):
-                        for j in range(5):
+                    for i in range(7): 
+                        for j in range(5): # 화면의 왼쪽 위부터 가로 1/10, 세로 1/10 크기의 칸을 나눠 가로로 5칸 세로로 7칸 동안 노란색을 찾아 마지막 노란색을 목표로 나아간다.
                             search_top_ = (i*h)/10
                             search_bot_ = ((i+1)*h)/10
                             mask_yellow_not_find[0:search_top_, 0:w] = 0
@@ -103,18 +112,18 @@ class Follow_yellow_right:
                             mask_yellow_not_find[0:h, (j+1)*w/10:w] = 0
                             M_temp = cv2.moments(mask_yellow_not_find)
                             if M_temp['m00'] > 0:
-                                moments_list.append(M_temp)
-                            mask_yellow_not_find[0:h, 0:w] = 1
-                    M_temp_last = moments_list.pop()
-                    cx_yellow = int(M_temp_last['m10'] / M_temp_last['m00'])
+                                moments_list.append(M_temp) # 찾는 노란색은 모두 리스트에 저장
+                            mask_yellow_not_find[0:h, 0:w] = 1 # 한칸 탐색이 끝나면 탐색범위 초기화.
+                    M_temp_last = moments_list.pop() # 가장 마지막에 들어온 칸을 추출
+                    cx_yellow = int(M_temp_last['m10'] / M_temp_last['m00']) # 목표로 삼고 전진
                     err = (cx_yellow) - w / 2
                     self.drive_key.key = "not_find"
                     self.twist.linear.x = 0.5
                     self.twist.angular.z = -float(err) / 200  # 400: 0.1, 300: 0.15, 250, 0.2,0.25:225 212.5 0.3
                     self.drive_key.twist = self.twist
                     self.drive_pub.publish(self.drive_key)
-                    self.drive_route_count = 0
-                    self.this_pub_state = 0
+                    self.drive_route_count = 0 # 초기화
+                    self.this_pub_state = 0 # follow_yellow_left로 넘어갔으므로 이 elif 문으로 못들어오게 한다.
 
         cv2.waitKey(3)
 
