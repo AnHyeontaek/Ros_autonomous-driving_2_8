@@ -66,30 +66,28 @@ class Follow_yellow_right:
         if not self.change_course: # 주차중이 아닐때
             mask_yellow[search_bot:h, 0:w] = 0 # 아래쪽은 찾지 않음
             # 주차코스 진입 시 오른쪽의 노란색 차선을 보고 들어가는데 
-        if self.only_right: 
+        if self.only_right: # 탐색 범위를 오른쪽으로 제한 할 경우
             mask_yellow[0:h, 0:w/2] = 0
         M = cv2.moments(mask_yellow)
 
         #list of moments to find next center line if not find center line
-        moments_list = list()
+        moments_list = list() # 노란색 추적 불가 시 다음 색 추적을 위해 사용할 리스트
 
-        if M['m00'] > 0:
-            del moments_list[:]
+        if M['m00'] > 0: # 범위 내에서 노란색을 찾았을 경우
+            del moments_list[:] # 리스트 초기화
             # BEGIN CONTROL
-            cx_yellow = int(M['m10']/M['m00'])
-            err = (cx_yellow - 250) - w / 2
-            if self.change_course:
-                err = (cx_yellow - 250) - w / 2
-            self.twist.linear.x = self.speed
+            cx_yellow = int(M['m10']/M['m00']) # 노란색의 x축 중앙값
+            err = (cx_yellow - 250) - w / 2 # 노란색의 x축 중앙값의 250만큼 왼쪽을 목표로 잡고 간다.
+            self.twist.linear.x = self.speed 
             self.twist.angular.z = -float(err) / (self.angular)  # 400: 0.1, 300: 0.15, 250, 0.2
-            self.drive_key.twist = self.twist
-            self.drive_key.key = "run"
+            self.drive_key.twist = self.twist # 정해진 방향과 속도를 보낸다.
+            self.drive_key.key = "run" # run이라는 키값을 보낸다.
             self.drive_pub.publish(self.drive_key)
             # END CONTROL
         else:
-            if self.change_course:
-                self.twist.linear.x = 0.5
-                self.drive_key.twist = self.twist
+            if self.change_course: # 방향전환 코스에 도달했을 시
+                self.twist.linear.x = 0.5 # 속도는 0.5
+                self.drive_key.twist = self.twist # 방향은 
                 self.drive_key.key = "run"
                 self.drive_pub.publish(self.drive_key)
             elif self.this_pub_state == 1:
