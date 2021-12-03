@@ -3,8 +3,6 @@
 import rospy, cv2, cv_bridge, numpy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Int32
-import time
 from deu_car.msg import drive_key
 from std_msgs.msg import String
 
