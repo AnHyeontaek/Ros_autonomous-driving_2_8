@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# # follow_white.py
+# change_course.py
 # 방향 전환 코스에서의 차선 인식 ,노란 정지선 인식 후 주행 담당
 # BEGIN ALL
 import rospy, cv2, cv_bridge, numpy
