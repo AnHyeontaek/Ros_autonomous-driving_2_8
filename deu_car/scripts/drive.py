@@ -115,57 +115,57 @@ class Drive:
                     self.speed_pub.publish("middle") # 속도 중간으로 변경.
                 elif self.stop_line_count == 2: # 두번째 정지선을 만났을 경우 ( 굴절코스 진입 )
                     self.speed_pub.publish("low") # 속도를 늦춘다.
-                elif self.stop_line_count == 4:
+                elif self.stop_line_count == 4: # 네번째 정지선을 만났을 경우 ( 첫번째 교차로 진입 )
+                    self.speed_pub.publish("low") # 속도를 늦춘다.
+                    self.drive_state = "run_straight" # drive_state 를 직진으로 바꾼다.
+                    p = threading.Thread(target=self.cross_run_1, args=[10]) # 10초간 직진. time.sleep() 함수는 프로그램을 멈추므로 쓰레드로 돌린다.
+                    p.start() # 쓰레드 시작.
+                    stop_time = 8 # 직진중 8초간 흰 선을 읽지 못하게 한다. 교차로 중간의 흰색 점선을 정지선이라고 읽고 멈추는 것 방지.
+                elif self.stop_line_count == 5: # 다섯번째 정지선을 만났을 경우 ( 곡선코스 진입 )
+                    self.speed_pub.publish("low") # 속도를 늦춘다.
+                    if self.start_route == 1: # 1번 코스
+                        self.drive_route = 1 # 노란 선을 왼쪽에 두고 진행
+                        self.drive_route_pub.publish("course_turning") # 곡선 코스 진입을 알린다.
+                        self.stop_line_count += 1 # 1번 코스는 2번코스에 비해 정지선이 하나 적어 원활한 진행을 위해 수를 맞춰준다.
+                        stop_time = 30 # 곡선코스는 굴절률이 높아 흰선이 정지선 읽는 위치에 올 때가 많아 곡선코스가 끝날 때까지 정지선 읽기를 꺼준다.
+                    elif self.start_route == 2:  # 2번 코스
+                        self.drive_route = 2 # 노란 선을 오쪽에 두고 진행
+                        self.drive_route_pub.publish("course_turning") # 곡선 코스 진입을 알린다.
+                        stop_time = 30 # 곡선코스는 굴절률이 높아 흰선이 정지선 읽는 위치에 올 때가 많아 곡선코스가 끝날 때까지 정지선 읽기를 꺼준다.
+                elif self.stop_line_count == 7: # 7번째 정지선을 만났을 경우 ( 두번째 교차로 진입 )
                     self.speed_pub.publish("low")
                     self.drive_state = "run_straight"
-                    p = threading.Thread(target=self.cross_run_1, args=[10])
+                    p = threading.Thread(target=self.cross_run_2) # 직진 후 방향 전환 코스 진입을 준비해야 하므로 따로 만든 함수를 실행한다.
                     p.start()
-                    stop_time = 8
-                elif self.stop_line_count == 5:
-                    self.speed_pub.publish("low")
-                    if self.start_route == 1:
-                        self.drive_route = 1
-                        self.drive_route_pub.publish("course_turning")
-                        self.stop_line_count += 1
-                        stop_time = 30
-                    elif self.start_route == 2:
-                        self.drive_route = 2
-                        self.drive_route_pub.publish("course_turning")
-                        stop_time = 30
-                elif self.stop_line_count == 7:
-                    self.speed_pub.publish("low")
-                    self.drive_state = "run_straight"
-                    p = threading.Thread(target=self.cross_run_2)
-                    p.start()
-                    stop_time = 15
-                elif self.stop_line_count == 8:
-                    self.drive_route = 3
-                elif self.stop_line_count == 11:
-                    self.drive_route = 5
-                else:
-                    self.speed_pub.publish("middle")
-                self.can_stop = False
-                t = threading.Thread(target=self.wait, args=[stop_time])
+                    stop_time = 15 # 직진중 15초간 흰 선을 읽지 못하게 한다. 교차로 중간의 흰색 점선을 정지선이라고 읽고 멈추는 것 방지.
+                elif self.stop_line_count == 8: # 8번째 정지선 인식. ( 방향 전환 코스 진입 )
+                    self.drive_route = 3 # 방향 전환 코스 실행
+                elif self.stop_line_count == 11: # 11번째 정지선 인식. ( 마지막 코스 진입 )
+                    self.drive_route = 5 # 마지막 코스 실행
+                else: # 이외의 정지선을 만날 경우
+                    self.speed_pub.publish("middle") # 속도 중간으로 바꿈.
+                self.can_stop = False # 정지 불가
+                t = threading.Thread(target=self.wait, args=[stop_time]) # 쓰레드로 stop_time 만큼의 시간을 기다린 후 정지 가능 여부를 가능으로 바꾼다.
                 t.start()
-            elif self.drive_tr == "change_course_start":
+            elif self.drive_tr == "change_course_start": # 방향 전환 코스 시작 명령이 내려오면 방향 전환 코스의 시작 정지선을 찾기 위해 노란선 인식 방향을 바꿔준다.
                 self.drive_route = 2
                 self.drive_route_pub.publish("1")
 
-    def drive_cb_2(self, msg):
-        if self.drive_route == 2:
-            self.drive_tr = msg.key
+    def drive_cb_2(self, msg): # 대부분의 follow_yellow_right.py 에서 넘어오는 명령을 처리함.
+        if self.drive_route == 2: # drive_route 가 2일때 이 함수를 실행한다.
+            self.drive_tr = msg.key # 넘어온 drive_key 저장
             self.twist = msg.twist
-            if self.drive_tr == "not_find":
-                self.drive_route = 1
-            else:
-                if self.on_bar == 1:
+            if self.drive_tr == "not_find": # not_find 명령이 넘어올 경우
+                self.drive_route = 1 # 왼쪽 노란선을 따라 주행하게 바꿔준다. ( 기본적으로 자동차는 우측통행이기 때문에 )
+            else: 
+                if self.on_bar == 1: # 차단바 탐지 중일시 멈춤
                     self.twist.linear.x = 0
                     self.send_twist(self.twist)
                     return
-                if self.drive_tr == "run" and self.drive_state == "run":
-                    self.send_twist(self.twist)
-                elif self.drive_tr == "stop" and self.can_stop:
-                    self.drive_state = "stop"
+                if self.drive_tr == "run" and self.drive_state == "run": # 넘어온 키값과 drive_state 가 run 이면 넘어온 정보대로 주행한다.
+                    self.send_twist(self.twist) 
+                elif self.drive_tr == "stop" and self.can_stop: # follow_white.py 에서 정지 신호가 날아오고 정지 가능한 상태일 경우
+                    self.drive_state = "stop" 
                     self.stop_line_count += 1
                     self.send_twist(self.twist)
                     time.sleep(3)
