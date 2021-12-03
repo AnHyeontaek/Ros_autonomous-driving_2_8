@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # BEGIN ALL
 # follow_white.py
-#차선 인식 후 주행 담당
+#정지선 인식 후 주행 담당
 # BEGIN ALL
 import rospy, cv2, cv_bridge, numpy
 from sensor_msgs.msg import Image
