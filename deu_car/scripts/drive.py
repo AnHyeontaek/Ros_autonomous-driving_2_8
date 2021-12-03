@@ -73,27 +73,7 @@ class Drive:
         self.g_last_send_time = t_now
         self.cmd_vel_pub.publish(self.last_twist)
 
-    def wait(self, stop_time): # 정지선을 일정 시간동안 읽지 못하게 하는 함수. 쓰레드로 돌린다.
-        time.sleep(stop_time) # 들어온 시간만큼 기다린다.
-        self.can_stop = True # 정지 가능 여부를 True로 바꾼다.
-        if stop_time == 20: # 20이 들어왔다는건 첫번째 표지판을 지나 왔다는 뜻.
-            self.end_sign = True # 다음 표지판이 코스의 마지막 표지판이다.
-
-    def accel(self): # 일정시간 가속을 위해 만들어진 함수
-        time.sleep(5) # 5초간 속도 변화없음
-        self.speed_pub.publish("middle") # 속도 중간으로 변경
-
-    def cross_run_1(self, count): # 첫번째 교차로를 위한 함수.(직진), 다른 곳에서도 일정시간 직진하는데 쓰인다.
-        time.sleep(count) # 일정 시간 기다린다.
-        self.drive_state = "run" # drive_state 다시 run으로 변경.
-
-    def cross_run_2(self): # 두번째 교차로를 위한 함수. 두번째 교차로 이후엔 방향전환 코스를 준비해야 해서 따로 만들었다.
-        time.sleep(10) # 10초간 직진
-        self.drive_state = "run"
-        time.sleep(3) # 3초 후에
-        self.drive_route_pub.publish("change_course") # 방향 전환 코스 준비 시작.
-
-    def drive_cb(self, msg): # follow_yellow_left.py 에서 넘어오는 정보를 담당한다.
+    def drive_cb(self, msg): # follow_yellow_left.py 에서 넘어오는 정보를 담당하는 콜백함수.
         if self.drive_route == 1: # 기본적으로 drive_route가 1일때 실행.
             self.drive_tr = msg.key # 넘어온 메시지를 저장한다.
             self.twist = msg.twist
@@ -151,7 +131,7 @@ class Drive:
                 self.drive_route = 2
                 self.drive_route_pub.publish("1")
 
-    def drive_cb_2(self, msg): # 대부분의 follow_yellow_right.py 에서 넘어오는 명령을 처리함.
+    def drive_cb_2(self, msg): # 대부분의 follow_yellow_right.py 에서 넘어오는 명령을 처리하는 콜백 함수.
         if self.drive_route == 2: # drive_route 가 2일때 이 함수를 실행한다.
             self.drive_tr = msg.key # 넘어온 drive_key 저장
             self.twist = msg.twist
@@ -165,110 +145,132 @@ class Drive:
                 if self.drive_tr == "run" and self.drive_state == "run": # 넘어온 키값과 drive_state 가 run 이면 넘어온 정보대로 주행한다.
                     self.send_twist(self.twist) 
                 elif self.drive_tr == "stop" and self.can_stop: # follow_white.py 에서 정지 신호가 날아오고 정지 가능한 상태일 경우
-                    self.drive_state = "stop" 
-                    self.stop_line_count += 1
-                    self.send_twist(self.twist)
-                    time.sleep(3)
-                    self.drive_state = "run"
-                    stop_time = 3
-                    if self.stop_line_count == 1:
-                        self.bar_sub.unregister()
-                        self.speed_pub.publish("middle")
-                    elif self.stop_line_count == 2:
-                        self.speed_pub.publish("low")
-                    elif self.stop_line_count == 8:
-                        self.drive_route = 3
-                        self.change_course_pub.publish("on")
-                        stop_time = 10
+                    self.drive_state = "stop" # drive_state를 "stop"으로 바꿔 주행을 막는다
+                    self.stop_line_count += 1 # 정지선 횟수 증가
+                    self.send_twist(self.twist) # 속도 0이 될때까지 함수 실행
+                    time.sleep(3) # 3초 정지  
+                    self.drive_state = "run" # drive_state 변경으로 다시 주행 시작.
+                    stop_time = 3 # 정지 후에 3초간 정지못하게 할 예정 그동안 정지선은 지나친다. 이걸 안해줬더니 바로 정지선 읽고 멈춤.
+                    if self.stop_line_count == 1: # 첫번째 정지선을 만났을 경우
+                        self.bar_sub.unregister() # 차단바 토픽 구독 변수 해제
+                        self.speed_pub.publish("middle") # 속도 중간으로 변경.
+                    elif self.stop_line_count == 2: # 두번째 정지선을 만났을 경우 ( 굴절코스 진입 )
+                        self.speed_pub.publish("low") # 속도를 늦춘다.
+                    elif self.stop_line_count == 8:# 8번째 정지선 인식. ( 방향 전환 코스 진입 )
+                        self.drive_route = 3 # 방향 전환 코스 실행
+                        self.change_course_pub.publish("on") # 방향 전환 코스 실행
+                        stop_time = 10 # 10초간 정지선 인식 막기 ( 방향 전환 코스에 흰선이 많아서 혹시 몰라서 )
                     else:
-                        self.speed_pub.publish("middle")
-                    self.can_stop = False
-                    t = threading.Thread(target=self.wait, args=[stop_time])
+                        self.speed_pub.publish("middle") # 
+                    self.can_stop = False # 정지 불가능
+                    t = threading.Thread(target=self.wait, args=[stop_time]) #쓰레드로 stop_time 시간 후 정지 가능으로 바꾼다.
                     t.start()
 
-    def change_course_cb(self, msg):
-        if self.drive_route == 3:
-            self.drive_tr = msg.key
+    def change_course_cb(self, msg): # 방향 전환 코스에서 실행되는 콜백 함수
+        if self.drive_route == 3: # 방향 전환 코스일시
+            self.drive_tr = msg.key # 넘어온 drive_key 변수 저장
             self.twist = msg.twist
-            if self.drive_tr == "run" and self.drive_state == "run":
+            if self.drive_tr == "run" and self.drive_state == "run": # 문제가 없으면 그대로 주행
                 self.send_twist(self.twist)
-            elif self.drive_tr == "stop" and self.can_stop:
-                self.stop_line_count += 1
-                stop_time = 30
-                self.drive_route = 4
+            elif self.drive_tr == "stop" and self.can_stop: # 정지선( 정해진 범위 안에 흰색이 들어왔을 때 / 방향 전환 구간(T자)에 들어왔을때)
+                self.stop_line_count += 1 # 정지선 횟수 증가
+                stop_time = 30 # 30초간 정지선 인식 불가 
+                self.drive_route = 4 # 일정시간 회전한다.
                 s = threading.Thread(target=self.turn)
                 s.start()
-                self.drive_state = "run"
-                self.can_stop = False
-                t = threading.Thread(target=self.wait, args=[stop_time])
+                self.drive_state = "run" # 회전이 끝나면 주행 시작
+                self.can_stop = False # 정지 불가
+                t = threading.Thread(target=self.wait, args=[stop_time]) # 30초 후 정지 가능
                 t.start()
-            elif self.drive_tr == "change_course_end":
-                self.drive_state = "run_straight"
-                p = threading.Thread(target=self.cross_run_1, args=[2])
+            elif self.drive_tr == "change_course_end": # 방향전환코스의 마지막에 도달했을 때 ( 노란색 바닥 )
+                self.drive_state = "run_straight" # 직진한다.
+                p = threading.Thread(target=self.cross_run_1, args=[2]) # 2초 후 직진 종료
                 p.start()
-                self.drive_route = 1
+                self.drive_route = 1 # 노란선을 왼쪽에 두고 주행 시작.
                 self.drive_route_pub.publish("2")
-        elif self.drive_route == 4:
-            self.twist.linear.x = 0
-            self.twist.angular.z = -0.2
+        elif self.drive_route == 4: # 방향 전환 구간에서 회전하는 소스
+            self.twist.linear.x = 0 # 속도 없이
+            self.twist.angular.z = -0.2 # 회전값만 준다.
             self.send_twist(self.twist)
 
-    def drive_last_course_cb(self, msg):
-        if self.drive_route == 5:
-            self.drive_tr = msg.key
+    def drive_last_course_cb(self, msg): # follow_last_course.py 에서 명령이 올때마다 실행되는 콜백 함수
+        if self.drive_route == 5: # 마지막 코스 시작
+            self.drive_tr = msg.key # 넘어온 drive_key 저장
             self.twist = msg.twist
-            if self.drive_tr == "run" and self.drive_state == "run":
+            if self.drive_tr == "run" and self.drive_state == "run": # 주행한다.
                 self.send_twist(self.twist)
 
-    def find_obstacle_cb(self, msg):
-        if msg.key == "obstacle":
-            self.drive_state = "obstacle_stop"
-            self.speed_pub.publish("high")
-            t = threading.Thread(target=self.accel)
+    def find_obstacle_cb(self, msg): # 장애물 인식 콜백 함수
+        if msg.key == "obstacle": # 장애물을 인식했을 시 key로 넘어온다.
+            self.drive_state = "obstacle_stop" # 상태를 장애물 인식으로 인한 정지로 바꾼다.
+            self.speed_pub.publish("high") # 장애물 빨리 넘어가려고 속도를 높여준다.
+            t = threading.Thread(target=self.accel) # 5초간 악셀
             t.start()
-            self.twist = Twist()
-            self.send_twist(self.twist)
-        elif msg.key == "no_obstacle" and self.drive_state == "obstacle_stop":
-            self.drive_state = "run"
+            self.twist = Twist() 
+            self.send_twist(self.twist) # twist 전달
+        elif msg.key == "no_obstacle" and self.drive_state == "obstacle_stop": # 장애물 인식 후 장애물이 없어졌을 시
+            self.drive_state = "run" # 다시 출발한다.
 
-    def sign_cb(self, msg):
-        if self.can_stop:
-            self.drive_state = "stop"
-            if self.end_sign:
-                self.drive_sub.unregister()
+    def sign_cb(self, msg): # 표지판 인식 콜백 함수
+        if self.can_stop: # 정지 가능한 상태일 경우 ( 표지판 인식 후 정지 불가능이 켜져서 한번만 읽는다. )
+            self.drive_state = "stop" # 정지상태로 변경
+            if self.end_sign: # 마지막 표지판일 경우
+                self.drive_sub.unregister() # 주행에 필요한 구독 변수를 정지시켜 주행을 멈춘다.
                 self.sign_sub.unregister()
                 self.drive_sub_2.unregister()
                 self.drive_last_course_sub.unregister()
-            time.sleep(3)
-            stop_time = 20
-            self.drive_state = "run"
+            time.sleep(3) # 3초 정지
+            stop_time = 20 # 20초 동안 정지를 막는다. ( 표지판 재 인식을 막기 위함. )
+            self.drive_state = "run" # 주행 시작
             self.can_stop = False
-            t = threading.Thread(target=self.wait, args=[stop_time])
+            t = threading.Thread(target=self.wait, args=[stop_time]) 
             t.start()
+            
+    def follow_bar(self, msg): # 차단바인식 콜백 함수
+        if msg.key == "bar": # 차단바를 읽었을 시
+            self.on_bar = 1 # 변수를 줘 주행을 막는다.
+        else: # 차단바르 못 읽었을 시
+            self.on_bar = 0 # 변수를 줘 주행한다.
 
-    def turn(self):
-        time.sleep(12)
-        self.drive_route = 3
+    def image_callback(self, msg): # 이미지 콜백 함수. 카메라가 이미지를 보낼때마다 실행됨. 상시 실행중
+        image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8') # 이미지 변수 선언
+        if self.drive_state == "run_straight": # 직진 상태일 때
+            self.twist.linear.x = 0.5 # 0.5의 속도로
+            self.twist.angular.z = 0 # 방향은 곧게 앞으로
+            self.send_twist(self.twist) # twist 변수를 발행한다.
+        cv2.imshow("window", image) # 윈도우창 실행
+        cv2.waitKey(3) 
+            
+    # 쓰레드로 돌아가는 함수들. 주로 일정 시간동안 변수값을 바뀌지 않게 하려고 만들었다.
+    def wait(self, stop_time): # 정지선을 일정 시간동안 읽지 못하게 하는 함수. 쓰레드로 돌린다.
+        time.sleep(stop_time) # 들어온 시간만큼 기다린다.
+        self.can_stop = True # 정지 가능 여부를 True로 바꾼다.
+        if stop_time == 20: # 20이 들어왔다는건 첫번째 표지판을 지나 왔다는 뜻.
+            self.end_sign = True # 다음 표지판이 코스의 마지막 표지판이다.
 
-    def follow_bar(self, msg):
-        if msg.key == "bar":
-            self.on_bar = 1
-        else:
-            self.on_bar = 0
+    def accel(self): # 일정시간 가속을 위해 만들어진 함수
+        time.sleep(5) # 5초간 속도 변화없음
+        self.speed_pub.publish("middle") # 속도 중간으로 변경
 
-    def image_callback(self, msg):
-        image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        if self.drive_state == "run_straight":
-            self.twist.linear.x = 0.5
-            self.twist.angular.z = 0
-            self.send_twist(self.twist)
-        cv2.imshow("window", image)
-        cv2.waitKey(3)
+    def cross_run_1(self, count): # 첫번째 교차로를 위한 함수.(직진), 다른 곳에서도 일정시간 직진하는데 쓰인다.
+        time.sleep(count) # 일정 시간 기다린다.
+        self.drive_state = "run" # drive_state 다시 run으로 변경.
 
-    def end(self):
-        print("program end")
+    def cross_run_2(self): # 두번째 교차로를 위한 함수. 두번째 교차로 이후엔 방향전환 코스를 준비해야 해서 따로 만들었다.
+        time.sleep(10) # 10초간 직진
+        self.drive_state = "run"
+        time.sleep(3) # 3초 후에
+        self.drive_route_pub.publish("change_course") # 방향 전환 코스 준비 시작.
+        
+    def turn(self): # 회전 시간을 보장해주는 함수. 쓰레드로 돌아가며 함수가 끝날때까지 회전한다.
+        time.sleep(12) # 12초간 회전
+        self.drive_route = 3 # 회전을 멈추고 다시 방향전환코스를 진행한다.
+    #쓰레드로 돌아가는 함수들 끝
+    
 
-if __name__ == "__main__":
-    rospy.init_node('drive')
-    drive = Drive(sys.argv[1])
+
+
+if __name__ == "__main__": # 메인함수
+    rospy.init_node('drive') # drive라는 노드 생성
+    drive = Drive(sys.argv[1]) # 실행 시 입력한 매개변수를 넣어 시작 코스를 결정한다.
     rospy.spin()
